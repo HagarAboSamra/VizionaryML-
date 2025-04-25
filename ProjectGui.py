@@ -3,227 +3,230 @@ from tkinter import ttk, filedialog, messagebox
 from PIL import Image
 import pandas as pd
 from tkinter.constants import CENTER
+import os 
 
-process = None  # Flag to track processing status
+# ======================= Main Application Class =======================
+class DataAnalysisApp:
+    def __init__(self):
+        self.root = ctk.CTk()
+        ctk.set_appearance_mode("light")
+        self.root.title('Data Analysis')
 
-root = ctk.CTk()  # Main window
-ctk.set_appearance_mode("light")  # Set light theme
-root.title('Data Analysis')  # Window title
-screen_width = root.winfo_screenwidth()  # Get screen width
-screen_height = root.winfo_screenheight()  # Get screen height
-root.geometry(f'{screen_width}x{screen_height}+{0}+{0}')  # Set window size and position
+        self.screen_width = self.root.winfo_screenwidth()
+        self.screen_height = self.root.winfo_screenheight()
+        self.root.geometry(f'{self.screen_width}x{self.screen_height}+0+0')
 
-# Variables to hold data before and after processing
-details_window = None  # Store details window reference
-selected_index = None  # Store index of selected row
-data = None  # Original data
-dataProcessed = None  # Processed data
+        self.data = None
+        self.data_processed = None
+        self.process = None
+        self.details_window = None
+        self.selected_index = None
 
-# Function to display initial content (an image)
-def initialFrame():
-    frameImg = ctk.CTkFrame(centerFrame)  # Frame to hold the image
-    frameImg.pack()
-    image = Image.open("image.jpg")  # Image path (static)
-    original_width, original_height = image.size  # Get original image size
-    image = ctk.CTkImage(image, size=(original_width + 200, original_height + 150))  # Resize image
-    img = ctk.CTkLabel(frameImg, text=' ', image=image)  # Label to hold the image
-    img.pack(side='top')  # Pack label into the frame
+        self.btn_frame = ctk.CTkFrame(self.root, fg_color='transparent')
+        self.center_frame = ctk.CTkFrame(self.root, fg_color='transparent')
 
-# Function to switch between pages (frames)
-def switch(page):
-    for child in centerFrame.winfo_children():  # Clear current page content
-        child.destroy()
-        root.update()
-    page()  # Call the page function to load new content
+        self.ui = AppUI(self)
+        self.logic = AppLogic(self)
 
-# Function to upload data (CSV or Excel files)
-def upload():
-    global data,process
-    process=None
-    file_path = filedialog.askopenfilename(
-            filetypes=[("CSV files", "*.csv"), ("Excel files", "*.xlsx")]  # File types to choose from
-        )
-    try:
-        if file_path:
-            if file_path.endswith('.csv'):  # If the file is CSV
-                data = pd.read_csv(file_path)
-            else:  # If the file is Excel
-                data = pd.read_excel(file_path)
-            
-            # Update button text and state
-            for btns in btnFrame.winfo_children():
-                if btns == uploadBtn:
-                    btns.configure(text='Replace file')
+        self.ui.build_ui()
+        self.logic.initial_frame()
+
+        self.root.mainloop()
+
+# ======================= UI Management =======================
+class AppUI:
+    def __init__(self, app):
+        self.app = app
+
+    def build_ui(self):
+        # Top button frame for navigation
+        self.app.btn_frame.pack(side='top', fill='x', pady=30)
+
+        self.app.upload_btn = ctk.CTkButton(self.app.btn_frame, text='Upload data', text_color='white', fg_color='blue', command=lambda: self.app.logic.switch(self.app.logic.upload), state='normal')
+        self.app.upload_btn.pack(side='left', padx=15, ipady=2)
+
+        self.app.processing_btn = ctk.CTkButton(self.app.btn_frame, text='Processing', text_color='white', fg_color='black', command=lambda: self.app.logic.switch(self.app.logic.processing), state='disabled')
+        self.app.processing_btn.pack(side='left', padx=15, ipady=2)
+
+        self.app.visualization_btn = ctk.CTkButton(self.app.btn_frame, text='Visualization', text_color='white', fg_color='black', command=lambda: self.app.logic.switch(self.app.logic.visualization), state='disabled')
+        self.app.visualization_btn.pack(side='left', padx=15, ipady=2)
+
+        self.app.view_data_btn = ctk.CTkButton(self.app.btn_frame, text='View data', text_color='white', fg_color='black', command=lambda: self.app.logic.switch(self.app.logic.view_data), state='disabled')
+        self.app.view_data_btn.pack(side='left', padx=15, ipady=2)
+
+        # Central frame for displaying dynamic content
+        self.app.center_frame.pack(side='top', expand=True, fill='both', pady=5, padx=5)
+
+# ======================= App Logic and Data Handling =======================
+class AppLogic:
+    def __init__(self, app):
+        self.app = app
+        # To get any image path 
+        self.base_dir = os.path.dirname(os.path.abspath(__file__)) 
+        self.images_dir = os.path.join(self.base_dir, "images") 
+        ''' 
+        you have to make path like that ...>
+        image_path = os.path.join(self.images_dir, "(name of image).jpg")
+        
+        '''
+    def load_image(self, filename):
+        return Image.open(os.path.join("images", filename))
+      
+    def initial_frame(self):
+        # Initial welcome image
+        frame_img = ctk.CTkFrame(self.app.center_frame)
+        frame_img.pack()
+        image = self.load_image("image.jpg")
+        original_width, original_height = image.size
+        image = ctk.CTkImage(image, size=(original_width + 200, original_height + 150))
+        img_label = ctk.CTkLabel(frame_img, text=' ', image=image)
+        img_label.pack(side='top')
+
+    def switch(self, page):
+        # Clear and show new frame
+        for child in self.app.center_frame.winfo_children():
+            child.destroy()
+            self.app.root.update()
+        page()
+
+    def upload(self):
+        self.app.process = None
+        file_path = filedialog.askopenfilename(filetypes=[("CSV files", "*.csv"), ("Excel files", "*.xlsx")])
+        try:
+            if file_path:
+                if file_path.endswith('.csv'):
+                    self.app.data = pd.read_csv(file_path)
                 else:
-                    btns.configure(state='normal', fg_color='green')
+                    self.app.data = pd.read_excel(file_path)
 
-            uploadFrame = ctk.CTkFrame(centerFrame, fg_color='transparent')  # Frame to display data
-            uploadFrame.pack(side='top', expand=True, fill='both', padx=50)
-            
-            tree = ttk.Treeview(uploadFrame)  # Treeview widget to display data
-            treeDefaults()  # Set default style for treeview
-            tree.delete(*tree.get_children())  # Clear previous data
-            viewTables(tree, data, uploadFrame)  # Populate treeview with data
+                for btn in self.app.btn_frame.winfo_children():
+                    if btn == self.app.upload_btn:
+                        btn.configure(text='Replace file')
+                    else:
+                        btn.configure(state='normal', fg_color='green')
 
-    except Exception as e:  # Handle errors during upload
-        messagebox.showerror("Error", f"An error occurred: {e}")
+                upload_frame = ctk.CTkFrame(self.app.center_frame, fg_color='transparent')
+                upload_frame.pack(side='top', expand=True, fill='both', padx=50)
 
-# Set style for Treeview widget
-def treeDefaults():
-    style = ttk.Style()
-    style.configure("Treeview.Heading", font=("Arial", 12, "bold"))
-    style.configure("Treeview", font=("Arial", 11), rowheight=25)
+                tree = ttk.Treeview(upload_frame)
+                self.tree_defaults()
+                tree.delete(*tree.get_children())
+                self.view_tables(tree, self.app.data, upload_frame)
 
-# Function to display data in Treeview
-def viewTables(tree, df, parent_frame):
-    try:
-        tree['columns'] = ["Index"] + list(df.columns)  # Set column headers
-        tree['show'] = 'headings'
-        
-        tree.column("Index", anchor=CENTER)  # Center-align Index column
-        tree.heading("Index", text="Index")
-        
-        # Create columns for each data field
-        for col in tree['columns'][1:]:
-            tree.column(col, anchor=CENTER)
-            tree.heading(col, text=col)
+        except Exception as e:
+            messagebox.showerror("Error", f"An error occurred: {e}")
 
-        # Insert rows into the Treeview
-        data_rows = df.to_numpy().tolist()
-        for idx, row in enumerate(data_rows):
-            tree.insert('', 'end', values=[df.index[idx]] + row)  # Add Index and row data
+    def tree_defaults(self):
+        style = ttk.Style()
+        style.configure("Treeview.Heading", font=("Arial", 12, "bold"))
+        style.configure("Treeview", font=("Arial", 11), rowheight=25)
 
-        # Create vertical scrollbar
-        vsb = ttk.Scrollbar(parent_frame, orient="vertical", command=tree.yview)
-        tree.configure(yscrollcommand=vsb.set)
-        vsb.pack(side="right", fill="y")
+    def view_tables(self, tree, df, parent_frame):
+        try:
+            tree['columns'] = ["Index"] + list(df.columns)
+            tree['show'] = 'headings'
 
-        # Create horizontal scrollbar
-        hsb = ttk.Scrollbar(parent_frame, orient="horizontal", command=tree.xview)
-        tree.configure(xscrollcommand=hsb.set)
-        hsb.pack(side="bottom", fill="x")  # Horizontal scrollbar at the bottom
+            tree.column("Index", anchor=CENTER)
+            tree.heading("Index", text="Index")
 
-        tree.pack(pady=20, fill='both', expand=True)
+            for col in tree['columns'][1:]:
+                tree.column(col, anchor=CENTER)
+                tree.heading(col, text=col)
 
-        # Bind row click event to select a row
-        tree.bind("<ButtonRelease-1>", lambda event, tree=tree, df=df: on_row_selected(event, tree, df))
-    except Exception as e:
-        messagebox.showerror("Error", f"An error occurred: {e}")
+            for idx, row in enumerate(df.to_numpy().tolist()):
+                tree.insert('', 'end', values=[df.index[idx]] + row)
 
-# Function to handle row selection
-def on_row_selected(event, tree, df):
-    global details_window, selected_index
-    selected_item = tree.selection()  # Get selected row
-    if selected_item:
-        item_values = tree.item(selected_item[0])["values"]
-        selected_index = item_values[0]  # Save the Index of the selected row
-        row_data = df.loc[df.index == selected_index].iloc[0]  # Extract data for the selected row
-        # Close any existing details window
-        if details_window:
-            details_window.destroy()
+            vsb = ttk.Scrollbar(parent_frame, orient="vertical", command=tree.yview)
+            tree.configure(yscrollcommand=vsb.set)
+            vsb.pack(side="right", fill="y")
 
-        # Display a new details window
-        show_row_details(row_data, df.columns)
+            hsb = ttk.Scrollbar(parent_frame, orient="horizontal", command=tree.xview)
+            tree.configure(xscrollcommand=hsb.set)
+            hsb.pack(side="bottom", fill="x")
 
-# Function to display details of the selected row
-def show_row_details(row_data, columns):
-    global details_window, selected_index
-    details_window = ctk.CTkToplevel(root)  # Create a new top-level window for row details
-    details_window.title("Row Details")  # Window title
-    width, height = 500, 400
-    x = (screen_width // 2) - (width // 2)  # Center window horizontally
-    y = (screen_height // 2) - (height // 2)  # Center window vertically
-    details_window.geometry(f"{width}x{height}+{x}+{y}")  # Set window geometry
-    details_window.configure(fg_color="white")  # Set background color
+            tree.pack(pady=20, fill='both', expand=True)
+            tree.bind("<ButtonRelease-1>", lambda event: self.on_row_selected(event, tree, df))
 
-    title = ctk.CTkLabel(details_window, text="Row Details", font=("Arial", 16, "bold"))  # Title label
-    title.pack(pady=10)
+        except Exception as e:
+            messagebox.showerror("Error", f"An error occurred: {e}")
 
-    # Create a scrollable frame for row details
-    scroll_frame = ctk.CTkScrollableFrame(details_window, width=460, height=300, fg_color="white")
-    scroll_frame.pack(pady=10, padx=20, fill="both", expand=True)
+    def on_row_selected(self, event, tree, df):
+        selected_item = tree.selection()
+        if selected_item:
+            item_values = tree.item(selected_item[0])["values"]
+            self.app.selected_index = item_values[0]
+            row_data = df.loc[df.index == self.app.selected_index].iloc[0]
+            if self.app.details_window:
+                self.app.details_window.destroy()
+            self.show_row_details(row_data, df.columns)
 
-    # Display the Index of the selected row
-    index_label = ctk.CTkLabel(scroll_frame, text=f"Index: {selected_index}", anchor="w", font=("Arial", 12), justify="left")
-    index_label.pack(anchor="w", pady=5, padx=5)
+    def show_row_details(self, row_data, columns):
+        # Display selected row in a popup
+        self.app.details_window = ctk.CTkToplevel(self.app.root)
+        self.app.details_window.title("Row Details")
+        width, height = 500, 400
+        x = (self.app.screen_width // 2) - (width // 2)
+        y = (self.app.screen_height // 2) - (height // 2)
+        self.app.details_window.geometry(f"{width}x{height}+{x}+{y}")
+        self.app.details_window.configure(fg_color="white")
 
-    # Display the details of each column in the selected row
-    for i, value in enumerate(row_data):
-        label = ctk.CTkLabel(scroll_frame, text=f"{columns[i]}: {value}", anchor="w", font=("Arial", 12), justify="left")
-        label.pack(anchor="w", pady=5, padx=5)
+        title = ctk.CTkLabel(self.app.details_window, text="Row Details", font=("Arial", 16, "bold"))
+        title.pack(pady=10)
 
-    # Disable "View Data" button while the details window is open
-    viewDataBtn.configure(state='disabled')
+        scroll_frame = ctk.CTkScrollableFrame(self.app.details_window, width=460, height=300, fg_color="white")
+        scroll_frame.pack(pady=10, padx=20, fill="both", expand=True)
 
-    # After closing the details window, re-enable the "View Data" button
-    details_window.protocol("WM_DELETE_WINDOW", on_close_details)
+        index_label = ctk.CTkLabel(scroll_frame, text=f"Index: {self.app.selected_index}", anchor="w", font=("Arial", 12), justify="left")
+        index_label.pack(anchor="w", pady=5, padx=5)
 
-# Function to handle closing of details window
-def on_close_details():
-    global details_window
-    if details_window:
-        details_window.destroy()
-        details_window = None
-    # Re-enable "View Data" button
-    viewDataBtn.configure(state='normal')
+        for i, value in enumerate(row_data):
+            label = ctk.CTkLabel(scroll_frame, text=f"{columns[i]}: {value}", anchor="w", font=("Arial", 12), justify="left")
+            label.pack(anchor="w", pady=5, padx=5)
 
-# Function to start data processing
-def processing():
-    global process
-    process = True
+        self.app.view_data_btn.configure(state='disabled')
+        self.app.details_window.protocol("WM_DELETE_WINDOW", self.on_close_details)
 
-# Placeholder function for visualization (currently empty)
-def visualization():
-    pass
+    def on_close_details(self):
+        if self.app.details_window:
+            self.app.details_window.destroy()
+            self.app.details_window = None
+        self.app.view_data_btn.configure(state='normal')
 
-# Function to display data in the given frame
-def view(frame, data_to_show):
-    for child in frame.winfo_children():  # Clear the current content
-        child.destroy()
-        root.update()
-    ii = ttk.Treeview(frame)  # Create a new Treeview widget
-    treeDefaults()  # Set default style for treeview
-    viewTables(ii, data_to_show, frame)  # Display the data in Treeview
+    def processing(self):
+        # Placeholder for processing logic
+        self.app.process = True
 
-# Function to display data in the "View Data" page
-def view_data():
-    global process 
-    viewDataFrame = ctk.CTkFrame(centerFrame, fg_color='transparent')
-    buttonF = ctk.CTkFrame(centerFrame, fg_color='transparent')
-    buttonF.pack(side='top', fill='x')
+    def visualization(self):
+        # Placeholder for visualization logic
+        pass
 
-    # Display an image at the top of the "View Data" page
-    img = Image.open("image2.jpg")  # Path to the image
-    image_to_display = ctk.CTkImage(img, size=(800, 600))  # Resize the image
-    image_label = ctk.CTkLabel(viewDataFrame,text=' ',image=image_to_display)  # Label to display the image
-    image_label.pack(side="top", padx=10, pady=10)
+    def view(self, frame, data_to_show):
+        # Render DataFrame to Treeview
+        for child in frame.winfo_children():
+            child.destroy()
+            self.app.root.update()
+        tree = ttk.Treeview(frame)
+        self.tree_defaults()
+        self.view_tables(tree, data_to_show, frame)
 
-    # Buttons for controlling data view
-    dataBefore = ctk.CTkButton(buttonF, text='Data before processing', text_color='white', fg_color='black', command=lambda: view(viewDataFrame, data))
-    dataAfter = ctk.CTkButton(buttonF, text='Data After processing', text_color='white', fg_color='black', command=lambda: view(viewDataFrame, dataProcessed), state='disabled' if process is None else 'normal')
+    def view_data(self):
+        # View section for original/processed data
+        view_data_frame = ctk.CTkFrame(self.app.center_frame, fg_color='transparent')
+        button_frame = ctk.CTkFrame(self.app.center_frame, fg_color='transparent')
+        button_frame.pack(side='top', fill='x')
+        image2_path = os.path.join(self.images_dir, "image2.jpg")
+        img = Image.open(image2_path)
+      
+        image_to_display = ctk.CTkImage(img, size=(800, 600))
+        image_label = ctk.CTkLabel(view_data_frame, text=' ', image=image_to_display)
+        image_label.pack(side="top", padx=10, pady=10)
 
-    dataBefore.pack(side='left', padx=10, ipady=2)
-    dataAfter.pack(side='left', padx=15, ipady=2)
-    viewDataFrame.pack(side='top', expand=True, fill='both', pady=5, padx=5)
+        data_before_btn = ctk.CTkButton(button_frame, text='Data before processing', text_color='white', fg_color='black', command=lambda: self.view(view_data_frame, self.app.data))
+        data_after_btn = ctk.CTkButton(button_frame, text='Data After processing', text_color='white', fg_color='black', command=lambda: self.view(view_data_frame, self.app.data_processed), state='disabled' if self.app.process is None else 'normal')
 
-# ===================== Button Frame =====================
-btnFrame = ctk.CTkFrame(root, fg_color='transparent')  # Frame to hold the buttons
-btnFrame.pack(side='top', fill='x', pady=30)
+        data_before_btn.pack(side='left', padx=10, ipady=2)
+        data_after_btn.pack(side='left', padx=15, ipady=2)
+        view_data_frame.pack(side='top', expand=True, fill='both', pady=5, padx=5)
 
-# Buttons for various actions
-uploadBtn = ctk.CTkButton(btnFrame, text='Upload data', text_color='white', fg_color='blue', command=lambda: switch(upload), state='normal')
-uploadBtn.pack(side='left', padx=15, ipady=2)
-processingBtn = ctk.CTkButton(btnFrame, text='Processing', text_color='white', fg_color='black', command=lambda: switch(processing), state='disabled')
-processingBtn.pack(side='left', padx=15, ipady=2)
-visualizationBtn = ctk.CTkButton(btnFrame, text='Visualization', text_color='white', fg_color='black', command=lambda: switch(visualization), state='disabled')
-visualizationBtn.pack(side='left', padx=15, ipady=2)
-viewDataBtn = ctk.CTkButton(btnFrame, text='View data', text_color='white', fg_color='black', command=lambda: switch(view_data), state='disabled')
-viewDataBtn.pack(side='left', padx=15, ipady=2)
-
-# ===================== Center Frame =====================
-centerFrame = ctk.CTkFrame(root, fg_color='transparent')  # Frame to hold the main content
-centerFrame.pack(side='top', expand=True, fill='both', pady=5, padx=5)
-
-initialFrame()  # Show the initial frame with the image
-
-root.mainloop()  # Start the main event loop to display the window
+if __name__ == "__main__":
+    DataAnalysisApp()
