@@ -3,7 +3,8 @@ from tkinter import ttk, filedialog, messagebox
 from PIL import Image
 import pandas as pd
 from tkinter.constants import CENTER
-import os 
+import os
+import io
 
 # ======================= Main Application Class =======================
 class DataAnalysisApp:
@@ -54,6 +55,9 @@ class AppUI:
         self.app.view_data_btn = ctk.CTkButton(self.app.btn_frame, text='View data', text_color='white', fg_color='black', command=lambda: self.app.logic.switch(self.app.logic.view_data), state='disabled')
         self.app.view_data_btn.pack(side='left', padx=15, ipady=2)
 
+        self.app.ML_model_btn = ctk.CTkButton(self.app.btn_frame, text='ML Model', text_color='white', fg_color='black', command=lambda: self.app.logic.switch(self.app.logic.ML_model), state='disabled')
+        self.app.ML_model_btn.pack(side='left', padx=15, ipady=2)
+
         # Central frame for displaying dynamic content
         self.app.center_frame.pack(side='top', expand=True, fill='both', pady=5, padx=5)
 
@@ -61,7 +65,7 @@ class AppUI:
 class AppLogic:
     def __init__(self, app):
         self.app = app
-        
+
         # Flags and state
         self.process = False
         self.processing_flag = False
@@ -121,6 +125,7 @@ class AppLogic:
 
         except Exception as e:
             messagebox.showerror("Error", f"An error occurred: {e}")
+
 
     def tree_defaults(self):
         style = ttk.Style()
@@ -290,6 +295,9 @@ class AppLogic:
 
     def visualize_data_type3(self, data):
         pass
+
+    def ML_model(self) :
+        pass 
 
     #function to determine whether to represent data before or after processing
     def set_processing_flag(self, val, btn_clicked, btn_disabled):
