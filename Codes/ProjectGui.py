@@ -263,14 +263,24 @@ class AppLogic:
         specific_btn = ctk.CTkButton(visualization_btns_frame, height=40, text="Specific columns", text_color='#A9A9A9', fg_color='#f1f1f1',
                                      command=lambda: self.set_columns_flag(True, specific_btn, all_btn))
         specific_btn.pack(side='left', padx=5, pady=2)
+        self.label_entry = ctk.CTkEntry(
+            visualization_btns_frame,
+            height=40,
+            text_color='black',
+            fg_color='white',
+            border_color='black',
+            border_width=1,
+            placeholder_text="Column Name"
+        )
+        self.label_entry.pack_forget()
 
-        label_btn = ctk.CTkButton(visualization_btns_frame, height=40, text="Label", text_color='black', fg_color='white',
-                                  border_color='black', border_width=1, command=self.apply)
-        label_btn.pack(side='left', padx=5, pady=2)
-
+        
         title = ctk.CTkLabel(left_frame, text='Visualization', text_color='#147eab', fg_color='transparent', font=("Arial", 24))
         title.pack(side='top', pady=30)
 
+        title = ctk.CTkLabel(left_frame, text='Category', text_color='#147eab', fg_color='transparent', font=("Arial", 24))
+        title.pack(side='top', pady=30)
+        
         button_data = [
             ("Type 1", lambda: self.visualize_data_type1(self.app.data)),
             ("Type 2", lambda: self.visualize_data_type2(self.app.data)),
@@ -280,6 +290,8 @@ class AppLogic:
             btn = ctk.CTkButton(left_frame, width=175, height=50, text=name, command=command, font=("Arial", 16))
             btn.pack(side='top', expand=False, pady=10)
             self.btn_refs[name] = btn #reference to reach buttons referring to visualization_data_types
+        title = ctk.CTkLabel(left_frame, text='numeric', text_color='#147eab', fg_color='transparent', font=("Arial", 24))
+        title.pack(side='top', pady=30)
 
     
     def visualize_data_type1(self, data):
@@ -307,9 +319,11 @@ class AppLogic:
         if not val:
             btn_clicked.configure(fg_color='black', text='✓ All data')
             btn_disabled.configure(fg_color='#f1f1f1', text='Specific columns')
+            self.label_entry.pack_forget()
         else:
             btn_clicked.configure(fg_color='black', text='✓ Specific columns')
             btn_disabled.configure(fg_color='#f1f1f1', text='All data')
+            self.label_entry.pack(side='left', padx=5, pady=2)
 
     #function to apply selected visualization features(before,after,all data,....)
     def apply(self):
