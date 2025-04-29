@@ -54,7 +54,6 @@ class AppUI:
                                              fg_color='black', command=lambda: self.app.logic.switch(self.app.logic.view_data), 
                                              state='disabled')
         self.app.view_data_btn.pack(side='left', padx=15, ipady=2)
-        self.app.center_frame.pack(side='top', expand=True, fill='both', pady=5, padx=5)
         self.app.ML_modle_btn = ctk.CTkButton(self.app.btn_frame, text='ML modle', text_color='white', 
                                              fg_color='black', command=lambda: self.app.logic.switch(self.app.logic.ML_model), 
                                              state='disabled')
