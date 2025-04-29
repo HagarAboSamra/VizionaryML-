@@ -448,6 +448,12 @@ class AppLogic:
         self.plot_frame.pack(fill='both', expand=True, padx=10, pady=10)
         
     def set_processing_flag(self, val, btn_clicked, btn_disabled):
+        self.apply_btn.pack_forget()
+        self.column_label.pack_forget()
+        self.column_dropdown.pack_forget()
+        self.second_column_label.pack_forget()
+        self.second_column_dropdown.pack_forget()
+
         """Set processing flag and show plot options"""
         self.processing_flag = val
         
