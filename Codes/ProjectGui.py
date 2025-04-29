@@ -55,6 +55,11 @@ class AppUI:
                                              state='disabled')
         self.app.view_data_btn.pack(side='left', padx=15, ipady=2)
         self.app.center_frame.pack(side='top', expand=True, fill='both', pady=5, padx=5)
+        self.app.ML_modle_btn = ctk.CTkButton(self.app.btn_frame, text='ML modle', text_color='white', 
+                                             fg_color='black', command=lambda: self.app.logic.switch(self.app.logic.ML_model), 
+                                             state='disabled')
+        self.app.ML_modle_btn.pack(side='left', padx=15, ipady=2)
+        self.app.center_frame.pack(side='top', expand=True, fill='both', pady=5, padx=5)
 
 # ======================= App Logic and Data Handling =======================
 class AppLogic:
@@ -838,6 +843,9 @@ class AppLogic:
         data_before_btn.pack(side='left', padx=10, ipady=2)
         data_after_btn.pack(side='left', padx=15, ipady=2)
         view_data_frame.pack(side='top', expand=True, fill='both', pady=5, padx=5)
+
+    def ML_model(self):
+      pass
 
 
 if __name__ == "__main__":
