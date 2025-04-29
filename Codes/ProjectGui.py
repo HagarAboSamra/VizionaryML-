@@ -39,25 +39,26 @@ class AppUI:
     def build_ui(self):
         self.app.btn_frame.pack(side='top', fill='x', pady=30)
         self.app.upload_btn = ctk.CTkButton(self.app.btn_frame, text='Upload data', text_color='white', 
-                                           fg_color='blue', command=lambda: self.app.logic.switch(self.app.logic.upload), 
-                                           state='normal')
+                                            fg_color='blue', command=lambda: self.app.logic.switch(self.app.logic.upload), 
+                                            state='normal')
         self.app.upload_btn.pack(side='left', padx=15, ipady=2)
         self.app.processing_btn = ctk.CTkButton(self.app.btn_frame, text='Processing', text_color='white', 
                                               fg_color='black', command=lambda: self.app.logic.switch(self.app.logic.processing), 
                                               state='disabled')
         self.app.processing_btn.pack(side='left', padx=15, ipady=2)
         self.app.visualization_btn = ctk.CTkButton(self.app.btn_frame, text='Visualization', text_color='white', 
-                                                 fg_color='black', command=lambda: self.app.logic.switch(self.app.logic.visualization), 
-                                                 state='disabled')
+                                                  fg_color='black', command=lambda: self.app.logic.switch(self.app.logic.visualization), 
+                                                  state='disabled')
         self.app.visualization_btn.pack(side='left', padx=15, ipady=2)
         self.app.view_data_btn = ctk.CTkButton(self.app.btn_frame, text='View data', text_color='white', 
-                                             fg_color='black', command=lambda: self.app.logic.switch(self.app.logic.view_data), 
-                                             state='disabled')
+                                              fg_color='black', command=lambda: self.app.logic.switch(self.app.logic.view_data), 
+                                              state='disabled')
         self.app.view_data_btn.pack(side='left', padx=15, ipady=2)
-        self.app.ML_modle_btn = ctk.CTkButton(self.app.btn_frame, text='ML modle', text_color='white', 
-                                             fg_color='black', command=lambda: self.app.logic.switch(self.app.logic.ML_model), 
-                                             state='disabled')
-        self.app.ML_modle_btn.pack(side='left', padx=15, ipady=2)
+        
+        self.app.ML_model_btn = ctk.CTkButton(self.app.btn_frame, text='ML Model', text_color='white',
+                                              fg_color='black', command=lambda: self.app.logic.switch(self.app.logic.ML_model), 
+                                              state='disabled')
+        self.app.ML_model_btn.pack(side='left', padx=15, ipady=2)
         self.app.center_frame.pack(side='top', expand=True, fill='both', pady=5, padx=5)
 
 # ======================= App Logic and Data Handling =======================
