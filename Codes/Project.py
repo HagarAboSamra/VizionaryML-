@@ -8,6 +8,17 @@ from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import seaborn as sns
 import matplotlib.pyplot as plt
+import tkinter as tk
+import numpy as np
+from sklearn.model_selection import train_test_split, cross_val_score, KFold
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.svm import SVC
+from sklearn.naive_bayes import GaussianNB
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.cluster import KMeans
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+from sklearn.metrics import confusion_matrix
 
 # ======================= Main Application Class =======================
 class DataAnalysisApp:
@@ -845,8 +856,171 @@ class AppLogic:
         view_data_frame.pack(side='top', expand=True, fill='both', pady=5, padx=5)
 
     def ML_model(self):
-      pass
+        frame = ctk.CTkFrame(self.app.center_frame)
+        frame.pack(expand=True, fill="both", padx=20, pady=20)
 
+        # Define all variables as instance attributes
+        self.selected_model = None
+        self.feature_columns = []
+        self.target_column = None
+        self.X, self.y = None, None
+
+        def select_model(name):
+            models_map = {
+                "Decision Tree": DecisionTreeClassifier(),
+                "KNN": KNeighborsClassifier(),
+                "SVM": SVC(),
+                "Naive Bayes": GaussianNB(),
+                "Random Forest": RandomForestClassifier(),
+                "KMeans": KMeans(n_clusters=3)
+            }
+            self.selected_model = models_map.get(name)
+            result_box.delete("0.0", "end")
+            result_box.insert("0.0", f"Selected Model: {name}")
+
+        def update_features():
+            if self.app.data is not None:
+                feature_listbox.delete(0, "end")
+                for col in self.app.data.columns:
+                    feature_listbox.insert("end", col)
+
+                target_menu.configure(values=list(self.app.data.columns))
+                target_menu.set(self.app.data.columns[0])
+
+        def set_features():
+            selected = feature_listbox.curselection()
+            self.feature_columns = [feature_listbox.get(i) for i in selected]
+            result_box.insert("end", f"\nSelected Features: {self.feature_columns}")
+
+        def set_target():
+            self.target_column = target_menu.get()
+            result_box.insert("end", f"\nSelected Target: {self.target_column}")
+
+        def prepare_data():
+            if self.app.data is not None and self.feature_columns and self.target_column:
+                self.X = self.app.data[self.feature_columns]
+                self.y = self.app.data[self.target_column]
+                result_box.insert("end", "\nData is ready for training!")
+                return True
+            else:
+                result_box.insert("end", "\nPlease select features and target first!")
+                return False
+
+        def evaluate_model():
+            if self.selected_model is None:
+                result_box.insert("end", "\nPlease select a model first!")
+                return
+            if not prepare_data():
+                return
+
+            # Train-Test Split
+            X_train, X_test, y_train, y_test = train_test_split(self.X, self.y, test_size=0.2, random_state=42)
+            self.selected_model.fit(X_train, y_train)
+            y_pred = self.selected_model.predict(X_test)
+
+            cm_split = confusion_matrix(y_test, y_pred)
+            acc_split = accuracy_score(y_test, y_pred)
+            prec_split = precision_score(y_test, y_pred, average='weighted', zero_division=0)
+            rec_split = recall_score(y_test, y_pred, average='weighted', zero_division=0)
+            f1_split = f1_score(y_test, y_pred, average='weighted', zero_division=0)
+
+            # K-Fold Cross-Validation
+            kf = KFold(n_splits=5, shuffle=True, random_state=42)
+            fold_metrics = []
+            for fold, (train_idx, test_idx) in enumerate(kf.split(self.X), 1):
+                X_train_fold, X_test_fold = self.X.iloc[train_idx], self.X.iloc[test_idx]
+                y_train_fold, y_test_fold = self.y.iloc[train_idx], self.y.iloc[test_idx]
+                self.selected_model.fit(X_train_fold, y_train_fold)
+                y_pred_fold = self.selected_model.predict(X_test_fold)
+
+                cm_fold = confusion_matrix(y_test_fold, y_pred_fold)
+                acc_fold = accuracy_score(y_test_fold, y_pred_fold)
+                prec_fold = precision_score(y_test_fold, y_pred_fold, average='weighted', zero_division=0)
+                rec_fold = recall_score(y_test_fold, y_pred_fold, average='weighted', zero_division=0)
+                f1_fold = f1_score(y_test_fold, y_pred_fold, average='weighted', zero_division=0)
+
+                fold_metrics.append({
+                    'fold': fold,
+                    'cm': cm_fold,
+                    'acc': acc_fold,
+                    'prec': prec_fold,
+                    'rec': rec_fold,
+                    'f1': f1_fold
+                })
+
+            # Compute average metrics for K-Fold
+            acc_kf_avg = np.mean([m['acc'] for m in fold_metrics])
+            prec_kf_avg = np.mean([m['prec'] for m in fold_metrics])
+            rec_kf_avg = np.mean([m['rec'] for m in fold_metrics])
+            f1_kf_avg = np.mean([m['f1'] for m in fold_metrics])
+
+            # Function to format confusion matrix as text
+            def format_cm(cm):
+                lines = ["Confusion Matrix:"]
+                for row in cm:
+                    lines.append("[" + ", ".join(f"{val:>4}" for val in row) + "]")
+                return "\n".join(lines)
+
+            # Prepare the result text
+            result = "Train-Test Split:\n"
+            result += format_cm(cm_split) + "\n"
+            result += f"Accuracy: {acc_split:.4f}\n"
+            result += f"Precision: {prec_split:.4f}\n"
+            result += f"Recall: {rec_split:.4f}\n"
+            result += f"F1-Score: {f1_split:.4f}\n\n"
+
+            result += "K-Fold Cross-Validation (5 folds):\n"
+            result += "Average Metrics:\n"
+            result += f"Accuracy: {acc_kf_avg:.4f}\n"
+            result += f"Precision: {prec_kf_avg:.4f}\n"
+            result += f"Recall: {rec_kf_avg:.4f}\n"
+            result += f"F1-Score: {f1_kf_avg:.4f}\n\n"
+
+            result += "Details per fold:\n"
+            for fold in fold_metrics:
+                result += f"Fold {fold['fold']}:\n"
+                result += format_cm(fold['cm']) + "\n"
+                result += f"Accuracy: {fold['acc']:.4f}\n"
+                result += f"Precision: {fold['prec']:.4f}\n"
+                result += f"Recall: {fold['rec']:.4f}\n"
+                result += f"F1-Score: {fold['f1']:.4f}\n\n"
+
+            # Insert the result into the text box
+            result_box.delete("0.0", "end")
+            result_box.insert("0.0", result)
+
+        # ============ UI Layout ============
+
+        top_frame = ctk.CTkFrame(frame)
+        top_frame.pack(fill="x", pady=50)
+
+        for model in ["Decision Tree", "KNN", "SVM", "Naive Bayes", "Random Forest", "KMeans"]:
+            ctk.CTkButton(top_frame, text=model, width=100, command=lambda m=model: select_model(m)).pack(side="left", padx=5)
+
+        body_frame = ctk.CTkFrame(frame)
+        body_frame.pack(expand=True, fill="both", pady=10 )
+
+        side_frame = ctk.CTkFrame(body_frame, width=300)
+        side_frame.pack(side="left", fill="y", padx=10)
+
+        ctk.CTkLabel(side_frame, text="Select Features").pack(pady=5)
+        feature_listbox = tk.Listbox(side_frame, selectmode="multiple", height=10)
+        feature_listbox.pack(pady=5)
+
+        ctk.CTkButton(side_frame, text="Set Features", command=set_features).pack(pady=5)
+
+        ctk.CTkLabel(side_frame, text="Target Column").pack(pady=5)
+        target_menu = ctk.CTkComboBox(side_frame, width=180)
+        target_menu.pack(pady=5)
+
+        ctk.CTkButton(side_frame, text="Set Target", command=set_target).pack(pady=5)
+        ctk.CTkButton(side_frame, text="Evaluate Model", command=evaluate_model).pack(pady=10)
+
+        result_box = ctk.CTkTextbox(body_frame, width=300)
+        result_box.pack(side="right", fill="both", expand=True, padx=20)
+        result_box.insert("0.0", "🔔 Model results will appear here...")
+
+        update_features()
 
 if __name__ == "__main__":
     DataAnalysisApp()
