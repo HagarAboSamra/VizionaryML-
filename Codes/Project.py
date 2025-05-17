@@ -3,7 +3,7 @@ from tkinter import ttk, filedialog, messagebox
 from PIL import Image
 import pandas as pd
 from tkinter.constants import CENTER
-import os 
+import os
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import seaborn as sns
@@ -19,8 +19,23 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.cluster import KMeans
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 from sklearn.metrics import confusion_matrix
+from sklearn.experimental import enable_iterative_imputer
+from sklearn.impute import SimpleImputer, KNNImputer
+from sklearn.preprocessing import MinMaxScaler, StandardScaler, LabelEncoder, OneHotEncoder, OrdinalEncoder
+import category_encoders as ce
 
-# ======================= Main Application Class =======================
+
+def drop_empty_cols(df):
+        for i in df:
+            if (df[i].isnull().sum()/df.shape[0])/100 >50:
+                df.drop(i,inplace=True)
+
+                
+def object_types_to_categorical(df):
+    for j in df.select_dtypes(include="object"):
+        df[j] = df[j].astype("category")
+    return df
+
 class DataAnalysisApp:
     def __init__(self):
         self.root = ctk.CTk()
@@ -42,45 +57,45 @@ class DataAnalysisApp:
         self.logic.initial_frame()
         self.root.mainloop()
 
-# ======================= UI Management =======================
 class AppUI:
     def __init__(self, app):
         self.app = app
 
     def build_ui(self):
         self.app.btn_frame.pack(side='top', fill='x', pady=30)
-        self.app.upload_btn = ctk.CTkButton(self.app.btn_frame, text='Upload data', text_color='white', 
-                                            fg_color='blue', command=lambda: self.app.logic.switch(self.app.logic.upload), 
+        self.app.upload_btn = ctk.CTkButton(self.app.btn_frame, text='Upload data', text_color='white',
+                                            fg_color='blue', command=lambda: self.app.logic.switch(self.app.logic.upload),
                                             state='normal')
         self.app.upload_btn.pack(side='left', padx=15, ipady=2)
-        self.app.processing_btn = ctk.CTkButton(self.app.btn_frame, text='Processing', text_color='white', 
-                                              fg_color='black', command=lambda: self.app.logic.switch(self.app.logic.processing), 
-                                              state='disabled')
+        self.app.processing_btn = ctk.CTkButton(self.app.btn_frame, text='Processing', text_color='white',
+                                                fg_color='black', command=lambda: self.app.logic.switch(self.app.logic.processing),
+                                                state='disabled')
         self.app.processing_btn.pack(side='left', padx=15, ipady=2)
-        self.app.visualization_btn = ctk.CTkButton(self.app.btn_frame, text='Visualization', text_color='white', 
-                                                  fg_color='black', command=lambda: self.app.logic.switch(self.app.logic.visualization), 
-                                                  state='disabled')
+        self.app.visualization_btn = ctk.CTkButton(self.app.btn_frame, text='Visualization', text_color='white',
+                                                    fg_color='black', command=lambda: self.app.logic.switch(self.app.logic.visualization),
+                                                    state='disabled')
         self.app.visualization_btn.pack(side='left', padx=15, ipady=2)
-        self.app.view_data_btn = ctk.CTkButton(self.app.btn_frame, text='View data', text_color='white', 
-                                              fg_color='black', command=lambda: self.app.logic.switch(self.app.logic.view_data), 
-                                              state='disabled')
+        self.app.view_data_btn = ctk.CTkButton(self.app.btn_frame, text='View data', text_color='white',
+                                                fg_color='black', command=lambda: self.app.logic.switch(self.app.logic.view_data),
+                                                state='disabled')
         self.app.view_data_btn.pack(side='left', padx=15, ipady=2)
-        
+
         self.app.ML_model_btn = ctk.CTkButton(self.app.btn_frame, text='ML Model', text_color='white',
-                                              fg_color='black', command=lambda: self.app.logic.switch(self.app.logic.ML_model), 
-                                              state='disabled')
+                                                fg_color='black', command=lambda: self.app.logic.switch(self.app.logic.ML_model),
+                                                state='disabled')
         self.app.ML_model_btn.pack(side='left', padx=15, ipady=2)
         self.app.center_frame.pack(side='top', expand=True, fill='both', pady=5, padx=5)
 
-# ======================= App Logic and Data Handling =======================
 class AppLogic:
     def __init__(self, app):
         self.app = app
-        self.app.process= None
+        self.app.process = None
         self.processing_flag = False
         self.columns_flag = False
         self.types_refs = {}
         self.btn_refs = {}
+        self.selected_encode_cols = []
+        self.selected_plot_cols = []
         self.selected_plot_button = None
         self.current_plot_type = None
         self.draw_functions = {
@@ -99,14 +114,17 @@ class AppLogic:
         self.categorical_plots = ["Pie Chart", "Bar Chart", "Horizontal Bar Chart", "Count Plot"]
         self.numerical_plots = ["Pair Plot", "Histogram Plot", "Box Plot", "Heatmap", "KDE Plot", "Scatter Plot"]
         self.two_column_plots = ["Count Plot", "Scatter Plot","Strip Plot"]
-        self.both_plots = ["Strip Plot"] 
+        self.both_plots = ["Strip Plot"]
         self.plot_frame = None
         self.second_column_dropdown = None
         self.second_column_label = None
+        self.right_frame = None
+
+        self.initialize_preprocessing_methods()
 
     def load_image(self, filename):
         return Image.open(os.path.join("images", filename))
-      
+
     def initial_frame(self):
         frame_img = ctk.CTkFrame(self.app.center_frame)
         frame_img.pack()
@@ -123,7 +141,7 @@ class AppLogic:
     def switch(self, page):
         for child in self.app.center_frame.winfo_children():
             child.destroy()
-            self.app.root.update()
+        self.app.root.update()
         page()
 
     def upload(self):
@@ -136,6 +154,9 @@ class AppLogic:
                 else:
                     self.app.data = pd.read_excel(file_path)
 
+                self.app.data_processed = self.app.data.copy()
+                self.app.data_processed = object_types_to_categorical(self.app.data_processed)
+
                 for btn in self.app.btn_frame.winfo_children():
                     if btn == self.app.upload_btn:
                         btn.configure(text='Replace file')
@@ -144,11 +165,12 @@ class AppLogic:
 
                 upload_frame = ctk.CTkFrame(self.app.center_frame, fg_color='transparent')
                 upload_frame.pack(side='top', expand=True, fill='both', padx=50)
+                drop_empty_cols(self.app.data_processed)
 
                 tree = ttk.Treeview(upload_frame)
                 self.tree_defaults()
                 tree.delete(*tree.get_children())
-                self.view_tables(tree, self.app.data, upload_frame)
+                self.view_tables(tree, self.app.data_processed, upload_frame)
 
         except Exception as e:
             messagebox.showerror("Error", f"An error occurred: {e}")
@@ -228,40 +250,377 @@ class AppLogic:
             self.app.details_window = None
         self.app.view_data_btn.configure(state='normal')
 
+    def update_tree(self, df, parent_frame):
+        for w in parent_frame.winfo_children():
+            w.destroy()
+        tree = ttk.Treeview(parent_frame)
+        self.tree_defaults()
+        tree.delete(*tree.get_children())
+        self.view_tables(tree, df, parent_frame)
+        
+    def simple_imputer(self, df, strategy="mean"):
+        if df is None:
+            messagebox.showerror("Error", "No data available for imputation")
+            return
+        try:
+            impute=SimpleImputer(strategy=strategy)
+            impted=df.select_dtypes(include='number').columns.tolist()
+            df[impted]=impute.fit_transform(df[impted])
+            messagebox.showinfo("Success", f"Applied {strategy} imputation successfully")      
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to impute missing values: {str(e)}")
+        
+    def fill_categorical(self, df, strategy="most_frequent", fill_value="None"):
+        if df is None:
+            return
+        # Get categorical columns with missing values
+        have_null = df.columns[df.isna().any()]
+        categorical = df[have_null].select_dtypes(include="category")
+        if categorical.empty:
+            messagebox.showinfo("Info", "No categorical columns with missing values found")
+            return
+        
+        try:
+            if strategy == "most_frequent":
+                imp = SimpleImputer(strategy=strategy)
+            else:
+                imp = SimpleImputer(strategy='constant' ,fill_value='NONE')
+            df[categorical.columns] = imp.fit_transform(categorical)    
+            messagebox.showinfo("Success", f"Applied {strategy} imputation to categorical columns")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to impute missing values: {str(e)}")
+
+    def k_mean_imputer(self, df, n_value=5):
+        if df is None:
+            return
+        cols_null = df.columns[df.isna().any()]
+        cols_num = df[cols_null].select_dtypes(include=[np.number])
+        if cols_num.empty:
+            messagebox.showinfo("Info", "No numeric columns with missing values found")
+            return
+        
+        try:
+            imputer = KNNImputer(n_neighbors=n_value)
+            df[cols_num.columns] = imputer.fit_transform(cols_num)
+            messagebox.showinfo("Success", f"Applied KNN imputation with {n_value} neighbors")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to impute missing values: {str(e)}")
+
+    def iterative_imputer(self, df):
+        if df is None:
+            return
+        cols_null = df.columns[df.isna().any()]
+        cols_num = df[cols_null].select_dtypes(include=[np.number]).columns
+        if len(cols_num) == 0:
+            messagebox.showinfo("Info", "No numeric columns with missing values found")
+            return
+        
+        try:
+            imp = IterativeImputer(max_iter=10, random_state=0)
+            df[cols_num] = imp.fit_transform(df[cols_num])
+            messagebox.showinfo("Success", "Applied iterative imputation to numeric columns")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to impute missing values: {str(e)}")
+
+    def outliers_z(self, df):
+        if df is None:
+            return
+        num = df.select_dtypes(include=[np.number])
+        if num.empty:
+            messagebox.showinfo("Info", "No numeric columns found for outlier detection")
+            return
+        
+        try:
+            z = np.abs(stats.zscore(num))
+            out = z[(z > 3).any(axis=1)]
+            df.drop(out.index, inplace=True)
+            messagebox.showinfo("Success", f"Removed {len(out)} outliers using Z-score method")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to remove outliers: {str(e)}")
+
+    def outliers_iqr(self, df):
+        if df is None:
+            return
+        num = df.select_dtypes(include=[np.number])
+        if num.empty:
+            messagebox.showinfo("Info", "No numeric columns found for outlier detection")
+            return
+        
+        try:
+            q1, q3 = num.quantile(0.25), num.quantile(0.75)
+            iqr = q3 - q1
+            mask = (num < (q1 - 1.5 * iqr)) | (num > (q3 + 1.5 * iqr))
+            outliers = mask[mask.any(axis=1)]
+            df.drop(outliers.index, inplace=True)
+            messagebox.showinfo("Success", f"Removed {len(outliers)} outliers using IQR method")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to remove outliers: {str(e)}")
+
+    def label_encoder(self, df, cols):
+        try:
+            enc = LabelEncoder()
+            for c in cols:
+                df[c] = enc.fit_transform(df[c])
+            messagebox.showinfo("Success", f"Applied Label Encoding to {len(cols)} columns")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to apply Label Encoding: {str(e)}")
+
+    def one_hot(self, df, cols):
+        try:
+            enc = OneHotEncoder(sparse_output=False, handle_unknown="ignore")
+            enc_arr = enc.fit_transform(df[cols])
+            enc_df = pd.DataFrame(enc_arr, columns=enc.get_feature_names_out(cols))
+            df.drop(cols, axis=1, inplace=True)
+            df.reset_index(drop=True, inplace=True)
+            df[enc_df.columns] = enc_df
+            messagebox.showinfo("Success", f"Applied One-Hot Encoding to {len(cols)} columns")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to apply One-Hot Encoding: {str(e)}")
+
+    def binary_enc(self, df, cols):
+        try:
+            enc = ce.BinaryEncoder(cols=cols)
+            new = enc.fit_transform(df[cols])
+            df.drop(cols, axis=1, inplace=True)
+            df[new.columns] = new
+            messagebox.showinfo("Success", f"Applied Binary Encoding to {len(cols)} columns")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to apply Binary Encoding: {str(e)}")
+
+    def ordinal_enc(self, df, cols):
+        try:
+            enc = ce.OrdinalEncoder(cols=cols)
+            df[cols] = enc.fit_transform(df[cols])
+            messagebox.showinfo("Success", f"Applied Ordinal Encoding to {len(cols)} columns")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to apply Ordinal Encoding: {str(e)}")
+
+    def minmax_scaler(self, df):
+        if df is None:
+            return
+        try:
+            scaler = MinMaxScaler()
+            numeric_cols = df.select_dtypes(include=[np.number]).columns
+            df[numeric_cols] = scaler.fit_transform(df[numeric_cols])
+            messagebox.showinfo("Success", "Applied Min-Max scaling to numeric columns")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to apply Min-Max scaling: {str(e)}")
+
+    def standard_scaler(self, df):
+        if df is None:
+            return
+        try:
+            scaler = StandardScaler()
+            numeric_cols = df.select_dtypes(include=[np.number]).columns
+            df[numeric_cols] = scaler.fit_transform(df[numeric_cols])
+            messagebox.showinfo("Success", "Applied Standard scaling to numeric columns")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to apply Standard scaling: {str(e)}")
+
+    def handle_duplicates(self, df):
+        if df is None:
+            return
+        try:
+            before = len(df)
+            df.drop_duplicates(inplace=True)
+            after = len(df)
+            removed = before - after
+            messagebox.showinfo("Success", f"Removed {removed} duplicate rows")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to remove duplicates: {str(e)}")
+
+    def initialize_preprocessing_methods(self):
+        self.numerical_missing = [
+            ("Simple imputer mean", lambda: self.simple_imputer(self.app.data_processed, "mean")),
+            ("Simple imputer median", lambda: self.simple_imputer(self.app.data_processed, "median")),
+            ("Simple imputer mode", lambda: self.simple_imputer(self.app.data_processed, "most_frequent")),
+            ("KNN imputer", lambda: self.k_mean_imputer(self.app.data_processed)),
+            ("Iterative imputer", lambda: self.iterative_imputer(self.app.data_processed)),
+        ]
+        self.categorical_missing = [
+            ("Simple imputer mode", lambda: self.fill_categorical(self.app.data_processed, "most_frequent")),
+            ("Simple imputer constant", lambda: self.fill_categorical(self.app.data_processed, "constant")),
+        ]
+        self.duplicates = [("Handling duplicates", lambda: self.handle_duplicates(self.app.data_processed))]
+        self.outliers = [
+            ("Z score", lambda: self.outliers_z(self.app.data_processed)),
+            ("IQR method", lambda: self.outliers_iqr(self.app.data_processed))
+        ]
+        self.encoding_methods = [
+            ("One hot encoder", lambda: None),
+            ("Label encoder", lambda: None),
+            ("Binary Encoder", lambda: None),
+            ("Ordinal encoder", lambda: None),
+        ]
+        self.normalization = [
+            ("Mini-max scaler", lambda: self.minmax_scaler(self.app.data_processed)),
+            ("Standard scaler", lambda: self.standard_scaler(self.app.data_processed))
+        ]
+        self.skew = [
+            ("Data Skewness",lambda: None)
+        ]
+        self.combo_defs = [
+            ("numerical NaN", self.numerical_missing),
+            ("categorical NaN", self.categorical_missing),
+            ("duplicates", self.duplicates),
+            ("outliers", self.outliers),
+            ("encoding", self.encoding_methods),
+            ("normalization", self.normalization),
+            ("skewness handeling",self.skew)
+        ]
+
+    def execute(self, choice):
+        for title, lst in self.combo_defs:
+            for name, func in lst:
+                if name == choice:
+                    func()
+                    self.update_tree(self.app.data_processed, self.right_frame)
+                    # self.view_tables(self.proc_tree, self.app.data_processed, self.right_frame)
+                    return
+
     def processing(self):
         self.app.process = True
         font = ("Arial", 16)
-
-        right_frame = ctk.CTkFrame(self.app.center_frame)
-        right_frame.pack(fill='both', side='right', expand=True, padx=5, pady=15)
-        left_frame = ctk.CTkFrame(self.app.center_frame, width=250, fg_color='#e6dedc', corner_radius=0)
-        left_frame.pack(fill='y', side='left', padx=15, pady=10, ipadx=10, ipady=10)
-
-        left_frame.pack_propagate(False)
-        right_frame.pack_propagate(False)
-
-        title = ctk.CTkLabel(left_frame, text='Processing', text_color='#147eab', fg_color='transparent', font=("Arial", 24))
-        title.pack(side='top', pady=30)
-
-        types = [
-            ("Type 1", lambda: self.process_data_type1(self.app.data)),
-            ("Type 2", lambda: self.process_data_type2(self.app.data)),
-            ("Type 3", lambda: self.process_data_type3(self.app.data))
-        ]
-        for txt, command in types:
-            btn = ctk.CTkButton(left_frame, width=175, height=50, text=txt, font=font, command=command)
-            btn.pack(side='top', expand=False, pady=10)
-            self.types_refs[txt] = btn
-
-    def process_data_type1(self, data):
-        pass
-
-    def process_data_type2(self, data):
-        pass
-
-    def process_data_type3(self, data):
-        pass
     
+        for widget in self.app.center_frame.winfo_children():
+            widget.destroy()
+    
+        left_frame = ctk.CTkFrame(self.app.center_frame, width=250, fg_color='#e6dedc', corner_radius=0)
+        left_frame.pack(side="left", fill="y", padx=15, pady=10)
+        left_frame.pack_propagate(False)
+    
+        self.right_frame = ctk.CTkFrame(self.app.center_frame)
+        self.right_frame.pack(side="right", expand=True, fill="both", padx=5, pady=15)
+    
+        title = ctk.CTkLabel(left_frame, text='Processing', text_color='#147eab', 
+                            fg_color='transparent', font=("Arial", 24))
+        title.pack(side='top', pady=20)
+    
+        for title_group, lst in self.combo_defs:
+            if title_group == "encoding":
+                self.encoding_cb = ctk.CTkComboBox(left_frame, values=[n for n, _ in lst], 
+                                                 width=180, command=self.update_encoding_checklist)
+                self.encoding_cb.set(title_group)
+                self.encoding_cb.pack(pady=6)
+            elif title_group == "skewness handeling":
+                self.skew_cb = ctk.CTkComboBox(left_frame, values=[n for n, _ in lst], 
+                                                 width=180, command=self.update_encoding_checklist)
+                self.skew_cb.pack(pady=6)
+                self.skew_cb.set(title_group)
+            else:
+                cb = ctk.CTkComboBox(left_frame, values=[n for n, _ in lst], 
+                                    width=180, command=self.execute)
+                cb.set(title_group)
+                cb.pack(pady=6)
+    
+        self.encode_frame = ctk.CTkScrollableFrame(left_frame, width=190, height=140)
+        self.encode_frame.pack(fill="both", expand=True, pady=6)
+    
+        self.encode_apply_btn = ctk.CTkButton(left_frame, text="Apply Encoding", width=180,
+                                            command=self.apply_selected_encoding)
+        self.encode_apply_btn.pack(pady=5)
+
+        self.skew_apply_btn = ctk.CTkButton(left_frame, text="Handle skewness", width=180,
+                                            command=self.apply_log_transform)
+        self.skew_apply_btn.pack(pady=10)
+    
+        self.proc_tree = ttk.Treeview(self.right_frame)
+        self.tree_defaults()
+        self.build_encode_checklist(self.app.data_processed, self.encode_frame)
+        self.view_tables(self.proc_tree, self.app.data_processed, self.right_frame)
+    
+    def update_encoding_checklist(self, choice):
+        if choice in ["One hot encoder", "Label encoder", "Binary Encoder", "Ordinal encoder"]:
+            if self.app.data_processed is not None:
+                self.build_encode_checklist(self.app.data_processed, self.encode_frame)
+        elif choice == "skewness handeling":
+            self.handle_skewness(self.app.data_processed, self.encode_frame)
+        
+    def build_encode_checklist(self, df, parent_frame):
+        for w in parent_frame.winfo_children():
+            w.destroy() 
+        if df is None:
+            return
+        
+        categorical_cols = df.select_dtypes(include="category").columns
+        if len(categorical_cols) == 0:
+            label = ctk.CTkLabel(parent_frame, text="No categorical columns found")
+            label.pack()
+            return
+        
+        for col in categorical_cols:
+            var = tk.BooleanVar(value=False)
+            
+            def toggle_column(column=col, variable=var):
+                if variable.get():
+                    if column not in self.selected_encode_cols:
+                        self.selected_encode_cols.append(column)
+                else:
+                    if column in self.selected_encode_cols:
+                        self.selected_encode_cols.remove(column)
+            
+            cb = ctk.CTkCheckBox(parent_frame, text=col, variable=var, 
+                                command=lambda c=col, v=var: toggle_column(c, v))
+            cb.pack(anchor="w")
+
+    def handle_skewness(self, df, left_frame, skew_threshold=1.0):
+        for widget in left_frame.winfo_children():
+            widget.destroy()
+        if df is None:
+            return
+    
+        numeric_cols = df.select_dtypes(include='number').columns
+        skewness = df[numeric_cols].apply(lambda x: x.skew()).abs()
+        skewed_cols = skewness[skewness > skew_threshold]
+    
+        if skewed_cols.empty:
+            ctk.CTkLabel(left_frame, text="No highly skewed numeric columns found.").pack(pady=10)
+            return
+    
+        self.log_var_dict = {}
+    
+        for col in skewed_cols.index:
+            var = ctk.BooleanVar()
+            cb = ctk.CTkCheckBox(left_frame, text=f"{col} (skew: {df[col].skew():.2f})", variable=var)
+            cb.pack(anchor="w", padx=20)
+            self.log_var_dict[col] = var
+
+    def apply_log_transform(self):
+        selected_cols = [col for col, var in self.log_var_dict.items() if var.get()]
+        if not selected_cols:
+            return
+
+        for col in selected_cols:
+            if (df[col] < 0).any():
+                print(f"Skipping '{col}' - contains negative values.")
+                continue
+            df[f"log_{col}"] = np.log1p(df[col])
+
+        self.update_tree(df, self.right_frame)
+    
+    def apply_selected_encoding(self):
+        if not self.selected_encode_cols or self.app.data_processed is None:
+            messagebox.showwarning("Warning", "No columns selected for encoding")
+            return
+            
+        encoding_method = self.encoding_cb.get()
+        try:
+            if encoding_method == "One hot encoder":
+                self.one_hot(self.app.data_processed, self.selected_encode_cols)
+            elif encoding_method == "Label encoder":
+                self.label_encoder(self.app.data_processed, self.selected_encode_cols)
+            elif encoding_method == "Binary Encoder":
+                self.binary_enc(self.app.data_processed, self.selected_encode_cols)
+            elif encoding_method == "Ordinal encoder":
+                self.ordinal_enc(self.app.data_processed, self.selected_encode_cols)
+                
+            self.update_tree(self.app.data_processed, self.right_frame)
+            self.build_encode_checklist(self.app.data_processed, self.encode_frame)
+            self.selected_encode_cols = []
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"An error occurred during encoding: {str(e)}")
+
     def handle_plot_selection(self, name):
         for plot_name, btn in self.btn_refs.items():
             btn.configure(fg_color="#f1f1f1", text_color="black", text=plot_name)
@@ -386,7 +745,7 @@ class AppLogic:
                             fg_color="#f1f1f1", text_color="black")
         btn.pack(pady=5)
         self.btn_refs[name] = btn
-        
+ 
     def visualization(self):
         self.current_plot_type = None
         right_frame = ctk.CTkFrame(self.app.center_frame, fg_color='transparent')
@@ -1015,7 +1374,6 @@ class AppLogic:
 
         ctk.CTkButton(side_frame, text="Set Target", command=set_target).pack(pady=5)
         ctk.CTkButton(side_frame, text="Evaluate Model", command=evaluate_model).pack(pady=10)
-
         result_box = ctk.CTkTextbox(body_frame, width=300)
         result_box.pack(side="right", fill="both", expand=True, padx=20)
         result_box.insert("0.0", "🔔 Model results will appear here...")
