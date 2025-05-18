@@ -23,14 +23,13 @@ from sklearn.experimental import enable_iterative_imputer
 from sklearn.impute import SimpleImputer, KNNImputer
 from sklearn.preprocessing import MinMaxScaler, StandardScaler, LabelEncoder, OneHotEncoder, OrdinalEncoder
 import category_encoders as ce
-
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 
 def drop_empty_cols(df):
-        for i in df:
-            if (df[i].isnull().sum()/df.shape[0])/100 >50:
-                df.drop(i,inplace=True)
+    for i in df:
+        if (df[i].isnull().sum()/df.shape[0])/100 >50:
+            df.drop(i,inplace=True)
 
-                
 def object_types_to_categorical(df):
     for j in df.select_dtypes(include="object"):
         df[j] = df[j].astype("category")
@@ -40,7 +39,7 @@ class DataAnalysisApp:
     def __init__(self):
         self.root = ctk.CTk()
         ctk.set_appearance_mode("light")
-        self.root.title('Data Analysis')
+        self.root.title('VizionaryML')
         self.screen_width = self.root.winfo_screenwidth()
         self.screen_height = self.root.winfo_screenheight()
         self.root.geometry(f'{self.screen_width}x{self.screen_height}+0+0')
@@ -64,9 +63,9 @@ class AppUI:
     def build_ui(self):
         self.app.btn_frame.pack(side='top', fill='x', pady=30)
         self.app.upload_btn = ctk.CTkButton(self.app.btn_frame, text='Upload data', text_color='white',
-                                            fg_color='blue', command=lambda: self.app.logic.switch(self.app.logic.upload),
+                                            fg_color='#1379ba', command=lambda: self.app.logic.switch(self.app.logic.upload),
                                             state='normal')
-        self.app.upload_btn.pack(side='left', padx=15, ipady=2)
+        self.app.upload_btn.pack(side='left', padx=150, ipady=2)
         self.app.processing_btn = ctk.CTkButton(self.app.btn_frame, text='Processing', text_color='white',
                                                 fg_color='black', command=lambda: self.app.logic.switch(self.app.logic.processing),
                                                 state='disabled')
@@ -119,24 +118,46 @@ class AppLogic:
         self.second_column_dropdown = None
         self.second_column_label = None
         self.right_frame = None
+        self.cm_image_label = None  # To store the CM image label
 
         self.initialize_preprocessing_methods()
 
     def load_image(self, filename):
         return Image.open(os.path.join("images", filename))
 
+    
     def initial_frame(self):
-        frame_img = ctk.CTkFrame(self.app.center_frame)
+        frame_img = ctk.CTkFrame(self.app.center_frame, fg_color="transparent")
         frame_img.pack()
+        
+        # Create a modern, colorful label for "VizionaryML"
+        title_label = ctk.CTkLabel(
+            frame_img,
+            text="VizionaryML\n\"Your Data, Your Story\" ",
+            font=("Comic sans ms", 35, "bold"),
+            text_color="#2596beDEB"  # Vibrant cyan color for modern look
+        )
+        title_label.pack(side="bottom", pady=10)
+        
         try:
-            image = self.load_image("image.jpg")
+            image = self.load_image("image.png")
             original_width, original_height = image.size
-            image = ctk.CTkImage(image, size=(original_width + 200, original_height + 150))
-            img_label = ctk.CTkLabel(frame_img, text=' ', image=image)
+            # Resize image to a reasonable size while maintaining aspect ratio
+            new_width = 400
+            aspect_ratio = original_height / original_width
+            new_height = int(new_width * aspect_ratio)
+            image = ctk.CTkImage(image, size=(new_width, new_height))
+            img_label = ctk.CTkLabel(frame_img, text="", image=image)
             img_label.pack(side='top')
         except FileNotFoundError:
-            img_label = ctk.CTkLabel(frame_img, text="Welcome to Data Analysis App", font=("Arial", 24))
-            img_label.pack(side='top')
+            # Fallback label with same modern style if image fails to load
+            img_label = ctk.CTkLabel(
+                frame_img,
+                text="Welcome to Data Analysis App",
+                font=("Roboto", 20),
+                text_color="#FF69B4"  # Hot pink for a vibrant, modern contrast
+            )
+            img_label.pack(side='top', pady=10)
 
     def switch(self, page):
         for child in self.app.center_frame.winfo_children():
@@ -273,7 +294,6 @@ class AppLogic:
     def fill_categorical(self, df, strategy="most_frequent", fill_value="None"):
         if df is None:
             return
-        # Get categorical columns with missing values
         have_null = df.columns[df.isna().any()]
         categorical = df[have_null].select_dtypes(include="category")
         if categorical.empty:
@@ -475,7 +495,6 @@ class AppLogic:
                 if name == choice:
                     func()
                     self.update_tree(self.app.data_processed, self.right_frame)
-                    # self.view_tables(self.proc_tree, self.app.data_processed, self.right_frame)
                     return
 
     def processing(self):
@@ -1086,7 +1105,7 @@ class AppLogic:
         numeric_df = df.select_dtypes(include="number")
         sns.heatmap(
             numeric_df.corr(),
-            annot=True,
+            annot=False,
             cmap="coolwarm",
             linewidths=0.5,
             square=True,
@@ -1185,6 +1204,40 @@ class AppLogic:
         except Exception as e:
             messagebox.showerror("Error", f"Failed to create plot: {str(e)}")
 
+    def show_cm_in_frame(self, frame, cm_list, model_name, class_labels):
+        """Save and display multiple confusion matrices in the given frame"""
+        # Clear previous content in the frame
+        for widget in frame.winfo_children():
+            widget.destroy()
+
+        try:
+            # Ensure the 'images' directory exists
+            os.makedirs("images", exist_ok=True)
+
+            # Create and save each confusion matrix plot
+            for cm_type, cm in cm_list:
+                fig = plt.figure(figsize=(6, 5))
+                sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', 
+                           xticklabels=class_labels, yticklabels=class_labels)
+                plt.xlabel('Predicted')
+                plt.ylabel('Actual')
+                plt.title(f'Confusion Matrix - {model_name} ({cm_type})')
+                plt.tight_layout()
+
+                # Save the plot as a PNG file
+                cm_image_path = os.path.join("images", f"cm_{cm_type.lower().replace(' ', '_')}_{model_name.lower().replace(' ', '_')}.png")
+                plt.savefig(cm_image_path, dpi=100, bbox_inches='tight')
+                plt.close(fig)
+
+                # Load and display the image in the GUI
+                image = Image.open(cm_image_path)
+                image = ctk.CTkImage(image, size=(400, 350))  # Adjust size to fit UI
+                label = ctk.CTkLabel(frame, text='', image=image)
+                label.pack(fill='x', expand=True, padx=10, pady=5)
+
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to display confusion matrix: {str(e)}")
+
     def view(self, frame, data_to_show):
         for child in frame.winfo_children():
             child.destroy()
@@ -1223,6 +1276,7 @@ class AppLogic:
         self.feature_columns = []
         self.target_column = None
         self.X, self.y = None, None
+        self.cm_frame = None  # Frame for displaying the CM
 
         def select_model(name):
             models_map = {
@@ -1272,6 +1326,9 @@ class AppLogic:
             if not prepare_data():
                 return
 
+            # Get unique class labels
+            class_labels = np.sort(self.y.unique()).astype(str).tolist()
+
             # Train-Test Split
             X_train, X_test, y_train, y_test = train_test_split(self.X, self.y, test_size=0.2, random_state=42)
             self.selected_model.fit(X_train, y_train)
@@ -1286,6 +1343,7 @@ class AppLogic:
             # K-Fold Cross-Validation
             kf = KFold(n_splits=5, shuffle=True, random_state=42)
             fold_metrics = []
+            cm_kfold_total = None  # To aggregate K-Fold CMs
             for fold, (train_idx, test_idx) in enumerate(kf.split(self.X), 1):
                 X_train_fold, X_test_fold = self.X.iloc[train_idx], self.X.iloc[test_idx]
                 y_train_fold, y_test_fold = self.y.iloc[train_idx], self.y.iloc[test_idx]
@@ -1306,6 +1364,12 @@ class AppLogic:
                     'rec': rec_fold,
                     'f1': f1_fold
                 })
+
+                # Aggregate K-Fold CM
+                if cm_kfold_total is None:
+                    cm_kfold_total = cm_fold
+                else:
+                    cm_kfold_total += cm_fold
 
             # Compute average metrics for K-Fold
             acc_kf_avg = np.mean([m['acc'] for m in fold_metrics])
@@ -1329,6 +1393,8 @@ class AppLogic:
             result += f"F1-Score: {f1_split:.4f}\n\n"
 
             result += "K-Fold Cross-Validation (5 folds):\n"
+            result += "Aggregated Confusion Matrix:\n"
+            result += format_cm(cm_kfold_total) + "\n"
             result += "Average Metrics:\n"
             result += f"Accuracy: {acc_kf_avg:.4f}\n"
             result += f"Precision: {prec_kf_avg:.4f}\n"
@@ -1348,6 +1414,21 @@ class AppLogic:
             result_box.delete("0.0", "end")
             result_box.insert("0.0", result)
 
+            # Display the confusion matrix plots in the GUI
+            model_name = [name for name, model in [
+                ("Decision Tree", DecisionTreeClassifier()),
+                ("KNN", KNeighborsClassifier()),
+                ("SVM", SVC()),
+                ("Naive Bayes", GaussianNB()),
+                ("Random Forest", RandomForestClassifier()),
+                ("KMeans", KMeans(n_clusters=3))
+            ] if model.__class__ == self.selected_model.__class__][0]
+            cm_list = [
+                ("Train-Test Split", cm_split),
+                ("K-Fold Aggregated", cm_kfold_total)
+            ]
+            self.show_cm_in_frame(self.cm_frame, cm_list, model_name, class_labels)
+
         # ============ UI Layout ============
 
         top_frame = ctk.CTkFrame(frame)
@@ -1357,7 +1438,7 @@ class AppLogic:
             ctk.CTkButton(top_frame, text=model, width=100, command=lambda m=model: select_model(m)).pack(side="left", padx=5)
 
         body_frame = ctk.CTkFrame(frame)
-        body_frame.pack(expand=True, fill="both", pady=10 )
+        body_frame.pack(expand=True, fill="both", pady=10)
 
         side_frame = ctk.CTkFrame(body_frame, width=300)
         side_frame.pack(side="left", fill="y", padx=10)
@@ -1374,9 +1455,19 @@ class AppLogic:
 
         ctk.CTkButton(side_frame, text="Set Target", command=set_target).pack(pady=5)
         ctk.CTkButton(side_frame, text="Evaluate Model", command=evaluate_model).pack(pady=10)
-        result_box = ctk.CTkTextbox(body_frame, width=300)
-        result_box.pack(side="right", fill="both", expand=True, padx=20)
-        result_box.insert("0.0", "🔔 Model results will appear here...")
+
+        # Create a frame for the results and CM plot
+        result_frame = ctk.CTkFrame(body_frame)
+        result_frame.pack(side="right", fill="both", expand=True, padx=20)
+
+        # Text box for metrics
+        result_box = ctk.CTkTextbox(result_frame, width=300)
+        result_box.pack(side="top", fill="both", expand=True, padx=10, pady=5)
+        result_box.insert("0.0", "🔍 Model results will appear here...")
+
+        # Scrollable frame for the confusion matrix plots
+        self.cm_frame = ctk.CTkScrollableFrame(result_frame, height=400)
+        self.cm_frame.pack(side="top", fill="both", expand=True, padx=10, pady=5)
 
         update_features()
 
