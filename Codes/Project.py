@@ -24,6 +24,7 @@ from sklearn.impute import SimpleImputer, KNNImputer
 from sklearn.preprocessing import MinMaxScaler, StandardScaler, LabelEncoder, OneHotEncoder, OrdinalEncoder
 import category_encoders as ce
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+from scipy import stats
 
 def drop_empty_cols(df):
     for i in df:
@@ -352,8 +353,9 @@ class AppLogic:
         
         try:
             z = np.abs(stats.zscore(num))
-            out = z[(z > 3).any(axis=1)]
-            df.drop(out.index, inplace=True)
+            mask = (z > 3).any(axis=1)
+            out = df[mask].index  # This is a Pandas Index already
+            df.drop(out, inplace=True) 
             messagebox.showinfo("Success", f"Removed {len(out)} outliers using Z-score method")
         except Exception as e:
             messagebox.showerror("Error", f"Failed to remove outliers: {str(e)}")
@@ -605,17 +607,21 @@ class AppLogic:
             self.log_var_dict[col] = var
 
     def apply_log_transform(self):
-        selected_cols = [col for col, var in self.log_var_dict.items() if var.get()]
-        if not selected_cols:
-            return
-
-        for col in selected_cols:
-            if (self.app.data_processed[col] < 0).any():
-                print(f"Skipping '{col}' - contains negative values.")
-                continue
-            self.app.data_processed[col] = np.log1p(self.app.data_processed[col])
-
-        self.update_tree(self.app.data_processed, self.right_frame)
+        try:
+            selected_cols = [col for col, var in self.log_var_dict.items() if var.get()]
+            if not selected_cols:
+                return
+    
+            for col in selected_cols:
+                if (self.app.data_processed[col] < 0).any():
+                    print(f"Skipping '{col}' - contains negative values.")
+                    continue
+                self.app.data_processed[col] = np.log1p(self.app.data_processed[col])
+    
+            self.update_tree(self.app.data_processed, self.right_frame)
+            messagebox.showinfo("Success", f"Applied log transform successfully") 
+        except Exception as e:
+            messagebox.showerror("Error", f"An error occurred during handling skewness: {str(e)}")
     
     def apply_selected_encoding(self):
         if not self.selected_encode_cols or self.app.data_processed is None:
