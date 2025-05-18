@@ -533,7 +533,7 @@ class AppLogic:
         if choice in ["One hot encoder", "Label encoder", "Binary Encoder", "Ordinal encoder"]:
             if self.app.data_processed is not None:
                 self.build_encode_checklist(self.app.data_processed, self.encode_frame)
-        elif choice == "skewness handeling":
+        elif choice in "Data Skewness":
             self.handle_skewness(self.app.data_processed, self.encode_frame)
         
     def build_encode_checklist(self, df, parent_frame):
@@ -591,12 +591,12 @@ class AppLogic:
             return
 
         for col in selected_cols:
-            if (df[col] < 0).any():
+            if (self.app.data_processed[col] < 0).any():
                 print(f"Skipping '{col}' - contains negative values.")
                 continue
-            df[f"log_{col}"] = np.log1p(df[col])
+            self.app.data_processed[col] = np.log1p(self.app.data_processed[col])
 
-        self.update_tree(df, self.right_frame)
+        self.update_tree(self.app.data_processed, self.right_frame)
     
     def apply_selected_encoding(self):
         if not self.selected_encode_cols or self.app.data_processed is None:
